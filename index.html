@@ -224,7 +224,7 @@ async function generateExamples(id) {
   const w = words.find(x => x.id === id);
   if (!w) return;
   const btn = document.getElementById('gen-' + id);
-  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Генерую два приклади...'; }
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Генерую приклад...'; }
 
   const topics = [
     "робота і колеги в офісі", "побут вдома, прибирання, готування", "подорож або відпустка",
@@ -232,26 +232,23 @@ async function generateExamples(id) {
     "навчання або курси", "погода і плани на вихідні", "транспорт, дорога на роботу",
     "хобі і вільний час", "розмова по телефону з лікарем чи службою", "переїзд або пошук квартири"
   ];
-  const t1 = topics[Math.floor(Math.random()*topics.length)];
-  let t2 = topics[Math.floor(Math.random()*topics.length)];
-  if (t2 === t1) t2 = topics[(topics.indexOf(t1)+1) % topics.length];
+  const topic = topics[Math.floor(Math.random()*topics.length)];
 
   try {
-    const prompt = `Придумай 2 РІЗНИХ живих приклади речення німецькою (рівень B1-B2) зі словом "${w.de}" (${w.ua || 'переклад невідомий'}).
-Приклад 1 — контекст: ${t1}.
-Приклад 2 — контекст: ${t2}.
-Речення мають звучати природно і відрізнятись за змістом одне від одного.
-Відповідь ТІЛЬКИ JSON масивом, без пояснень:
-[{"de":"речення1","ua":"переклад1"},{"de":"речення2","ua":"переклад2"}]`;
+    const prompt = `Придумай 1 живий приклад речення німецькою (рівень B1-B2) зі словом "${w.de}" (${w.ua || 'переклад невідомий'}).
+Контекст: ${topic}.
+Речення має звучати природно в цьому контексті.
+Відповідь ТІЛЬКИ JSON, без пояснень:
+{"de":"речення","ua":"переклад"}`;
 
     const text = await callAI(prompt);
     const clean = text.replace(/```json|```/g, '').trim();
-    const match = clean.match(/\[[\s\S]*\]/);
+    const match = clean.match(/\{[\s\S]*?\}/);
     if (!match) throw new Error('parse');
     const parsed = JSON.parse(match[0]);
-    w.examples = parsed.slice(0,2).map(e => ({ de: e.de, ua: e.ua }));
+    w.examples = [{ de: parsed.de, ua: parsed.ua }];
     save();
-    toast('✅ Два приклади згенеровано');
+    toast('✅ Приклад згенеровано');
     render();
   } catch(e) {
     toast('Помилка генерації, спробуй ще раз');
@@ -308,7 +305,7 @@ function render() {
         </div>
       ` : ''}
       <button class="gen-btn" id="gen-${w.id}" onclick="generateExamples(${w.id})">
-        ${w.examples.length ? '↻ Згенерувати нові приклади' : '✦ Згенерувати 2 приклади'}
+        ${w.examples.length ? '↻ Згенерувати новий приклад' : '✦ Згенерувати приклад'}
       </button>
     </div>
   `).join('');
