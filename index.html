@@ -142,6 +142,22 @@
   .voice-feedback.ok { display:block; background:var(--moss-bg); color:var(--moss); }
   .voice-feedback.bad { display:block; background:#fce8e3; color:var(--rust); }
 
+  /* ── Тренажер прикладів (writer) ── */
+  .ex-card { background:#fff; border:1px solid var(--rule); border-radius:14px; padding:16px; margin-bottom:14px; }
+  .ex-textarea {
+    width:100%; background:var(--paper); border:1px solid var(--rule); border-radius:10px; color:var(--ink);
+    font-family:'IBM Plex Sans',sans-serif; font-size:15px; line-height:1.5; padding:12px 50px 12px 12px; outline:none; resize:vertical;
+    height:130px; box-sizing:border-box;
+  }
+  .ex-textarea:focus { border-color:var(--rust); }
+  .ex-mic-btn {
+    position:absolute; top:8px; right:8px; width:34px; height:34px; border-radius:50%; border:none;
+    background:var(--moss); color:#fff; font-size:16px; cursor:pointer; display:flex; align-items:center; justify-content:center;
+  }
+  .ex-spin { width:14px; height:14px; border:2px solid var(--rule); border-top-color:var(--rust); border-radius:50%; display:inline-block; animation:sp .7s linear infinite; }
+  .ex-feedback { display:none; border-radius:10px; padding:12px; margin:10px 0; font-size:13px; line-height:1.6; }
+  .ex-done-card { background:var(--moss-bg); border:1px solid #b9cdb6; border-radius:14px; padding:24px; text-align:center; }
+
   .empty { text-align:center; padding:50px 20px; color:var(--ink-soft); }
   .empty-glyph { font-family:'IBM Plex Sans',sans-serif; font-size:2.5rem; color:var(--rule); margin-bottom:8px; }
 
