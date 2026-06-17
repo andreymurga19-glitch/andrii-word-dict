@@ -343,8 +343,10 @@ function setMode(m) {
   document.getElementById('listView').style.display = m === 'list' ? 'block' : 'none';
   document.getElementById('cardsView').style.display = m === 'cards' ? 'block' : 'none';
   document.getElementById('voiceView').style.display = m === 'voice' ? 'block' : 'none';
+  document.getElementById('examplesView').style.display = m === 'examples' ? 'block' : 'none';
   if (m === 'cards') { cardIdx = 0; cardFlipped = false; renderCards(); }
-  if (m === 'voice') { voiceIdx = 0; renderVoice(); }
+  if (m === 'voice') { spIdx = 0; renderVoice(); }
+  if (m === 'examples') { exPIdx = 0; renderExamples(); }
 }
 
 function cardsPool() {
@@ -413,132 +415,366 @@ function cardStep(dir) {
   renderCards();
 }
 
-// ── Голосовий тренажер ──
-let voiceRecognition = null;
-let voiceListening = false;
+// ── Голосовий тренажер (вимова одного слова) ──
+let spRecognition = null;
+let spListening = false;
+let spIdx = 0;
+let spCorrect = 0;
+let spWrong = 0;
 
-function voicePool() {
-  return words.filter(w => w.examples.length > 0);
+function spPool() {
+  return words;
+}
+
+function spCleanWord(de) {
+  return de
+    .replace(/^(der|die|das|der\/die)\s+/i, '')
+    .replace(/,.*$/, '')
+    .replace(/\s*\(.*?\)/g, '')
+    .replace(/\s*\+.*$/, '')
+    .trim();
 }
 
 function renderVoice() {
-  const pool = voicePool();
+  if (spRecognition) { try { spRecognition.abort(); } catch(e){} spListening = false; }
+  const pool = spPool();
   const el = document.getElementById('voiceView');
   if (!pool.length) {
-    el.innerHTML = `<div class="empty"><div class="empty-glyph">—</div>Спочатку згенеруй приклади хоча б для одного слова.</div>`;
+    el.innerHTML = `<div class="empty"><div class="empty-glyph">—</div>Спочатку додай хоча б одне слово.</div>`;
     return;
   }
-  if (voiceIdx >= pool.length) voiceIdx = 0;
-  if (voiceIdx < 0) voiceIdx = pool.length - 1;
-  const w = pool[voiceIdx];
+  if (spIdx >= pool.length) spIdx = 0;
+  if (spIdx < 0) spIdx = pool.length - 1;
+  const w = pool[spIdx];
 
   el.innerHTML = `
-    <div class="card-empty-hint">Слово ${voiceIdx+1} / ${pool.length}</div>
+    <div class="card-empty-hint">Слово ${spIdx+1} / ${pool.length}</div>
+    <div class="stats" style="margin-bottom:14px">
+      <div class="stat"><div class="stat-num" style="color:var(--moss)">${spCorrect}</div><div class="stat-lbl">правильно</div></div>
+      <div class="stat"><div class="stat-num" style="color:var(--rust)">${spWrong}</div><div class="stat-lbl">помилок</div></div>
+    </div>
     <div class="voice-card">
-      <div class="voice-word">${escapeHtml(w.de)}</div>
-      <div class="voice-ua">${escapeHtml(w.ua || '')}</div>
-      <button class="voice-mic-btn" id="voiceMicBtn" onclick="voiceMicToggle(${w.id})">🎤</button>
-      <div class="voice-status" id="voiceStatus">Натисни мікрофон і скажи речення з цим словом</div>
-      <div class="voice-result" id="voiceResult"></div>
-      <div class="voice-feedback" id="voiceFeedback"></div>
+      <div class="voice-ua" style="margin-bottom:14px">${escapeHtml(w.ua || '')}</div>
+      <div class="sp-word" id="spWord" onclick="spReveal()">${escapeHtml(w.de)}</div>
+      <div id="spHint" style="font-size:11px;color:var(--ink-soft);margin-top:8px">👆 Натисни щоб підказати</div>
+      <div id="spResult" class="sp-result"></div>
+      <button class="voice-mic-btn" id="spMicBtn" onclick="spListen()" style="margin-top:16px">🎤</button>
+      <div class="voice-status" id="spStatus">Натисни 🎤 і вимов слово по-німецьки</div>
     </div>
     <div class="card-nav">
-      <button class="card-nav-btn" onclick="voiceStep(-1)">← Назад</button>
-      <span class="card-pos">${voiceIdx+1} / ${pool.length}</span>
-      <button class="card-nav-btn" onclick="voiceStep(1)">Далі →</button>
+      <button class="card-nav-btn" onclick="spStep(-1)">← Назад</button>
+      <span class="card-pos">${spIdx+1} / ${pool.length}</span>
+      <button class="card-nav-btn" onclick="spStep(1)">Далі →</button>
     </div>
   `;
 }
 
-function voiceStep(dir) {
-  if (voiceListening && voiceRecognition) { try { voiceRecognition.abort(); } catch(e){} voiceListening = false; }
-  voiceIdx += dir;
+function spReveal() {
+  const el = document.getElementById('spWord');
+  const hint = document.getElementById('spHint');
+  if (el) el.style.filter = 'none';
+  if (hint) hint.textContent = '';
+}
+
+function spStep(dir) {
+  if (spRecognition) { try { spRecognition.abort(); } catch(e){} spListening = false; }
+  spIdx += dir;
   renderVoice();
 }
 
-function voiceMicToggle(wordId) {
+function spListen() {
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  const btn = document.getElementById('voiceMicBtn');
-  const status = document.getElementById('voiceStatus');
-  const result = document.getElementById('voiceResult');
-  const feedback = document.getElementById('voiceFeedback');
+  const statusEl = document.getElementById('spStatus');
   if (!SpeechRecognition) {
-    if (status) status.textContent = '❌ Розпізнавання підтримується тільки в Chrome';
+    if (statusEl) statusEl.textContent = '❌ Тільки Chrome підтримує розпізнавання';
+    return;
+  }
+  if (spListening) return;
+  if (spRecognition) { try { spRecognition.abort(); } catch(e){} }
+
+  const pool = spPool();
+  const w = pool[spIdx];
+  const target = spCleanWord(w.de);
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = 'de-DE';
+  recognition.interimResults = false;
+  recognition.maxAlternatives = 5;
+  recognition.continuous = false;
+  spRecognition = recognition;
+  spListening = true;
+
+  const micBtn = document.getElementById('spMicBtn');
+  if (micBtn) micBtn.classList.add('listening');
+  if (statusEl) statusEl.textContent = '🎙️ Слухаю… говори зараз!';
+
+  const resetMic = () => {
+    spListening = false;
+    if (micBtn) micBtn.classList.remove('listening');
+  };
+
+  recognition.onresult = (event) => {
+    resetMic();
+    const alternatives = [];
+    for (let i = 0; i < event.results[0].length; i++) {
+      alternatives.push(event.results[0][i].transcript.toLowerCase().trim());
+    }
+    const heard = alternatives[0];
+    const t = target.toLowerCase().replace(/[^a-zäöüß\s]/gi, '').trim();
+    const isCorrect = alternatives.some(alt => {
+      const a = alt.replace(/[^a-zäöüß\s]/gi, '').trim();
+      return a === t || a.includes(t) || t.includes(a) || spLevenshtein(a, t) <= Math.max(1, Math.floor(t.length * 0.3));
+    });
+    spShowResult(isCorrect, heard, target);
+  };
+
+  recognition.onerror = (event) => {
+    resetMic();
+    const msgs = {
+      'not-allowed': '❌ Дозволь мікрофон у браузері!',
+      'no-speech': '🔇 Не почув. Говори голосніше.',
+      'network': '🌐 Потрібен інтернет для розпізнавання.',
+      'aborted': ''
+    };
+    if (statusEl && msgs[event.error] !== undefined) statusEl.textContent = msgs[event.error] || ('Помилка: ' + event.error);
+  };
+
+  recognition.onend = resetMic;
+
+  try { recognition.start(); } catch(e) {
+    resetMic();
+    if (statusEl) statusEl.textContent = 'Помилка запуску мікрофона';
+  }
+}
+
+function spShowResult(isCorrect, heard, target) {
+  const resultEl = document.getElementById('spResult');
+  const statusEl = document.getElementById('spStatus');
+  spReveal();
+  if (!resultEl) return;
+
+  if (isCorrect) {
+    spCorrect++;
+    resultEl.className = 'sp-result ok';
+    resultEl.innerHTML = `<div style="font-size:24px">✅</div><div style="font-weight:600;color:var(--moss)">Чудово! Правильно!</div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px">Почув: «${escapeHtml(heard)}»</div>`;
+    if (statusEl) statusEl.textContent = '🎉 Відмінно!';
+    setTimeout(() => spStep(1), 1600);
+  } else {
+    spWrong++;
+    resultEl.className = 'sp-result bad';
+    resultEl.innerHTML = `<div style="font-size:24px">❌</div><div style="font-weight:600;color:var(--rust)">Правильно: «${escapeHtml(target)}»</div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px">Почув: «${escapeHtml(heard)}»</div>`;
+    if (statusEl) statusEl.textContent = '🔄 Спробуй ще раз';
+  }
+}
+
+function spLevenshtein(a, b) {
+  if (!a || !b) return Math.max((a||'').length, (b||'').length);
+  const dp = Array.from({length: a.length+1}, (_, i) => Array.from({length: b.length+1}, (_, j) => i === 0 ? j : j === 0 ? i : 0));
+  for (let i = 1; i <= a.length; i++)
+    for (let j = 1; j <= b.length; j++)
+      dp[i][j] = a[i-1] === b[j-1] ? dp[i-1][j-1] : 1 + Math.min(dp[i-1][j], dp[i][j-1], dp[i-1][j-1]);
+  return dp[a.length][b.length];
+}
+
+// ── Тренажер прикладів (писемний, з AI-перевіркою і підказкою) ──
+let exPending = [];
+let exPIdx = 0;
+let exRecognition = null;
+let exListening = false;
+window._exLastCorrected = null;
+
+function exPool() {
+  return words.filter(w => w.examples.length === 0);
+}
+
+function renderExamples() {
+  if (exRecognition) { try { exRecognition.abort(); } catch(e){} exListening = false; }
+  exPending = exPool();
+  if (exPIdx >= exPending.length) exPIdx = 0;
+  const el = document.getElementById('examplesView');
+
+  if (!exPending.length) {
+    el.innerHTML = `<div class="ex-done-card"><div style="font-size:2.2rem">✅</div><div style="font-weight:700;margin-top:6px">Усі слова мають приклад!</div><div style="font-size:12px;color:var(--ink-soft);margin-top:4px">Додай нове слово або згенеруй нові приклади у списку.</div></div>`;
     return;
   }
 
-  if (voiceListening) {
-    if (voiceRecognition) { try { voiceRecognition.abort(); } catch(e){} }
-    voiceListening = false;
-    if (btn) { btn.classList.remove('listening'); btn.textContent = '🎤'; }
+  const w = exPending[exPIdx];
+
+  el.innerHTML = `
+    <div class="card-empty-hint">Слово ${exPIdx+1} / ${exPending.length}</div>
+    <div class="ex-card">
+      <div class="word-row" style="margin-bottom:12px">
+        <div class="word-de">${escapeHtml(w.de)}</div>
+        ${w.ua ? `<div class="word-ua">${escapeHtml(w.ua)}</div>` : ''}
+      </div>
+      <div style="font-size:12px;color:var(--ink-soft);margin-bottom:7px">Напиши своє речення по-німецьки:</div>
+      <div style="position:relative">
+        <textarea id="exInput" class="ex-textarea" placeholder="Речення..."></textarea>
+        <button class="ex-mic-btn" id="exMicBtn" onclick="exMicToggle()">🎤</button>
+      </div>
+      <div id="exMicStatus" style="font-size:11px;color:var(--ink-soft);margin:4px 0 8px;min-height:14px"></div>
+      <div id="exFeedback" class="ex-feedback"></div>
+      <div style="display:flex;gap:8px;margin-bottom:8px">
+        <button class="add-btn" style="flex:1;background:#fff;color:var(--ink);border:1px solid var(--rule)" onclick="exSkip()">⏭ Пропустити</button>
+        <button class="add-btn" style="flex:1" onclick="exCheck(${w.id})">✓ Перевірити</button>
+      </div>
+      <button class="add-btn" style="width:100%;background:var(--moss)" onclick="exAiSuggest(${w.id})">💡 Підказка від AI</button>
+    </div>
+  `;
+}
+
+function exSkip() {
+  exPIdx = (exPIdx + 1) % Math.max(1, exPending.length);
+  renderExamples();
+}
+
+function exMicToggle() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const btn = document.getElementById('exMicBtn');
+  const status = document.getElementById('exMicStatus');
+  const input = document.getElementById('exInput');
+  if (!SpeechRecognition) { if (status) status.textContent = '❌ Тільки Chrome'; return; }
+
+  if (exListening) {
+    if (exRecognition) { try { exRecognition.abort(); } catch(e){} }
+    exListening = false;
+    if (btn) { btn.style.background = 'var(--moss)'; btn.textContent = '🎤'; }
+    if (status) status.textContent = '';
     return;
   }
-
-  if (voiceRecognition) { try { voiceRecognition.abort(); } catch(e){} }
-  feedback.className = 'voice-feedback';
-  result.className = 'voice-result';
+  if (exRecognition) { try { exRecognition.abort(); } catch(e){} }
 
   const recognition = new SpeechRecognition();
   recognition.lang = 'de-DE';
   recognition.interimResults = false;
   recognition.continuous = false;
   recognition.maxAlternatives = 1;
-  voiceRecognition = recognition;
-  voiceListening = true;
+  exRecognition = recognition;
+  exListening = true;
 
-  if (btn) { btn.classList.add('listening'); btn.textContent = '⏺'; }
-  if (status) status.textContent = '🎙️ Говори...';
+  if (btn) { btn.style.background = 'var(--rust)'; btn.textContent = '⏺'; }
+  if (status) status.textContent = '🎙️ Говори по-німецьки...';
 
-  recognition.onresult = async function(e) {
+  recognition.onresult = function(e) {
     const text = e.results[0][0].transcript;
-    result.textContent = '« ' + text + ' »';
-    result.classList.add('show');
-    if (status) status.textContent = 'Перевіряю...';
-
-    const w = words.find(x => x.id === wordId);
-    const wordEx = w && w.examples.length ? w.examples[0].de : '';
-    try {
-      const prompt = `Учень вивчає німецьке слово "${w ? w.de : ''}" (${w ? w.ua : ''}).
-Зразок правильного використання: "${wordEx}".
-Учень сказав голосом: "${text}".
-
-Завдання: оціни, чи учень сказав ОСМИСЛЕНЕ РЕЧЕННЯ (а не просто повторив саме слово) і чи використав слово "${w ? w.de : ''}" доречно за змістом.
-Якщо учень просто повторив слово без речення - напиши доброзичливо, що треба скласти ціле речення, і дай простий приклад.
-Якщо це речення з помилкою - покажи виправлений варіант.
-Якщо все добре - похвали коротко.
-Відповідь українською, 1-2 речення, дружньо.
-Відповідь ТІЛЬКИ JSON: {"ok": true/false, "feedback":"текст фідбеку"}`;
-      const aiText = await callAI(prompt);
-      const clean = aiText.replace(/```json|```/g, '').trim();
-      const match = clean.match(/\{[\s\S]*?\}/);
-      const parsed = match ? JSON.parse(match[0]) : { ok: true, feedback: 'Добре!' };
-      feedback.textContent = (parsed.ok ? '✅ ' : '💬 ') + parsed.feedback;
-      feedback.className = 'voice-feedback ' + (parsed.ok ? 'ok' : 'bad');
-      if (status) status.textContent = '';
-    } catch(err) {
-      if (status) status.textContent = '';
-      feedback.textContent = 'Не вдалось перевірити, але текст розпізнано вище.';
-      feedback.className = 'voice-feedback ok';
+    if (input) {
+      const cur = input.value.trim();
+      const cap = text.charAt(0).toUpperCase() + text.slice(1);
+      input.value = cur ? cur + ' ' + text : cap;
     }
+    if (status) status.textContent = '✅ Розпізнано! Перевір текст і натисни "Перевірити"';
   };
-
   recognition.onerror = function(e) {
     if (status) {
-      if (e.error === 'no-speech') status.textContent = '🤔 Нічого не почув, спробуй ще раз';
+      if (e.error === 'no-speech') status.textContent = '🤔 Нічого не почув';
       else if (e.error === 'not-allowed') status.textContent = '❌ Потрібен доступ до мікрофона';
       else status.textContent = '❌ Помилка: ' + e.error;
     }
   };
-
   recognition.onend = function() {
-    voiceListening = false;
-    if (btn) { btn.classList.remove('listening'); btn.textContent = '🎤'; }
+    exListening = false;
+    if (btn) { btn.style.background = 'var(--moss)'; btn.textContent = '🎤'; }
   };
+  try { recognition.start(); } catch(e) { if (status) status.textContent = '❌ Не вдалося запустити мікрофон'; exListening = false; }
+}
 
-  try { recognition.start(); } catch(e) {
-    if (status) status.textContent = '❌ Не вдалося запустити мікрофон';
-    voiceListening = false;
+const exTopics = [
+  "робота і колеги в офісі", "побут вдома, прибирання, готування", "подорож або відпустка",
+  "стосунки з друзями або сім'єю", "похід в магазин або ресторан", "спорт і здоров'я",
+  "навчання або курси", "погода і плани на вихідні", "транспорт, дорога на роботу",
+  "хобі і вільний час", "розмова по телефону з лікарем чи службою", "переїзд або пошук квартири"
+];
+
+async function exAiSuggest(wordId) {
+  const w = words.find(x => x.id === wordId);
+  if (!w) return;
+  const fb = document.getElementById('exFeedback');
+  fb.style.display = 'block';
+  fb.style.background = '#fff';
+  fb.style.border = '1px solid var(--rule)';
+  fb.innerHTML = '<span class="ex-spin"></span> AI генерує приклад...';
+
+  try {
+    const topic = exTopics[Math.floor(Math.random()*exTopics.length)];
+    const prompt = `Придумай 1 живий приклад речення рівня B1-B2 для слова: "${w.de}" (${w.ua || 'переклад невідомий'}).
+Контекст ситуації: ${topic}.
+Речення має звучати природно в цьому контексті.
+ТІЛЬКИ JSON: {"de":"речення","ua":"переклад"}`;
+    const text = await callAI(prompt);
+    const clean = text.replace(/```json|```/g,'').trim();
+    const m = clean.match(/\{[\s\S]*?\}/);
+    if (!m) throw new Error();
+    const ex = JSON.parse(m[0]);
+    fb.style.background = 'var(--moss-bg)';
+    fb.style.border = '1px solid #b9cdb6';
+    fb.innerHTML = `
+      <div style="font-weight:600;color:var(--moss);margin-bottom:6px">🤖 Варіант від AI:</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink);background:#fff;padding:8px 10px;border-radius:6px;margin:4px 0">${escapeHtml(ex.de)}</div>
+      <div style="font-size:12px;color:var(--moss);margin-top:3px;font-style:italic">${escapeHtml(ex.ua)}</div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="add-btn" style="flex:1;min-width:110px" data-de="${escapeHtml(ex.de)}" data-ua="${escapeHtml(ex.ua)}" onclick="exSaveFromAttr(${w.id}, this)">✅ Зафіксувати</button>
+        <button class="add-btn" style="flex:1;min-width:110px;background:var(--moss)" onclick="exAiSuggest(${w.id})">🔄 Ще інший</button>
+      </div>`;
+  } catch(e) {
+    fb.innerHTML = '<div style="color:var(--rust)">❌ Помилка генерації, спробуй ще раз</div>';
   }
+}
+
+function exSaveFromAttr(wordId, btn) {
+  exSaveDirect(wordId, btn.dataset.de, btn.dataset.ua);
+}
+
+async function exCheck(wordId) {
+  const w = words.find(x => x.id === wordId);
+  const input = document.getElementById('exInput');
+  const own = input?.value.trim();
+  if (!own) { toast('Напиши речення!'); return; }
+  const fb = document.getElementById('exFeedback');
+  fb.style.display = 'block';
+  fb.style.background = '#fff';
+  fb.style.border = '1px solid var(--rule)';
+  fb.innerHTML = '<span class="ex-spin"></span> Перевіряю...';
+
+  try {
+    const prompt = `Перевір речення учня для слова "${w.de}" (${w.ua || ''}).
+Речення: "${own}"
+ТІЛЬКИ JSON: {"correct":true,"comment":"коментар українською","corrected":"виправлене або те саме","corrected_ua":"переклад"}`;
+    const text = await callAI(prompt);
+    const clean = text.replace(/```json|```/g,'').trim();
+    const m = clean.match(/\{[\s\S]*?\}/);
+    if (!m) throw new Error();
+    const res = JSON.parse(m[0]);
+    const ok = res.correct;
+    window._exLastCorrected = { de: res.corrected || own, ua: res.corrected_ua || '' };
+    fb.style.background = ok ? 'var(--moss-bg)' : '#fff3e0';
+    fb.style.border = '1px solid ' + (ok ? '#b9cdb6' : '#f0c896');
+    fb.innerHTML = `
+      <div style="font-weight:600;color:${ok?'var(--moss)':'#c97a1f'};margin-bottom:5px">${ok?'✅ Правильно!':'⚠️ Є помилки'}</div>
+      <div style="color:var(--ink-soft);margin-bottom:6px">${escapeHtml(res.comment||'')}</div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:var(--ink);background:#fff;padding:8px 10px;border-radius:6px;margin:4px 0">${escapeHtml(res.corrected||'')}</div>
+      <div style="font-size:12px;color:var(--moss);margin-top:3px;font-style:italic">${escapeHtml(res.corrected_ua||'')}</div>
+      <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+        <button class="add-btn" style="flex:1;min-width:100px" onclick="exSaveCorrected(${w.id})">✅ Зафіксувати</button>
+        <button class="add-btn" style="flex:1;min-width:100px;background:#fff;color:var(--ink);border:1px solid var(--rule)" onclick="exSkip()">⏭ Інше слово</button>
+      </div>`;
+  } catch(e) {
+    fb.innerHTML = '<div style="color:var(--rust)">Помилка перевірки.</div>';
+  }
+}
+
+function exSaveCorrected(wordId) {
+  const c = window._exLastCorrected || {};
+  exSaveDirect(wordId, c.de || '', c.ua || '');
+}
+
+function exSaveDirect(wordId, de, ua) {
+  const w = words.find(x => x.id === wordId);
+  if (!w) return;
+  w.examples = [{ de, ua }];
+  exampleVisible[w.id] = true;
+  save();
+  toast('✅ Приклад збережено!');
+  renderExamples();
 }
 
 function escapeHtml(s) {
