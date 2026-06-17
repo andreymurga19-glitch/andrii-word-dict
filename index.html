@@ -607,7 +607,6 @@ function renderExamples() {
         <div class="word-de">${escapeHtml(w.de)}</div>
         ${w.ua ? `<div class="word-ua">${escapeHtml(w.ua)}</div>` : ''}
       </div>
-      ${existing ? `<div style="background:var(--paper2);border-radius:6px;padding:9px 11px;margin-bottom:12px;font-size:12.5px"><div style="color:var(--ink-soft);font-size:10px;text-transform:uppercase;letter-spacing:.04em;margin-bottom:3px">Поточний приклад</div><div style="color:var(--ink)">${escapeHtml(existing.de)}</div><div style="color:var(--moss);font-style:italic;margin-top:2px">${escapeHtml(existing.ua)}</div></div>` : ''}
       <div style="font-size:12px;color:var(--ink-soft);margin-bottom:7px">Напиши своє речення по-німецьки:</div>
       <div style="position:relative">
         <textarea id="exInput" class="ex-textarea" placeholder="Речення..."></textarea>
