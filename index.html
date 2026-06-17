@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Словник Андрія</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600;9..144,700&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --paper: #faf6ee;
+    --paper2: #f2ecdc;
+    --ink: #2b2620;
+    --ink-soft: #6e6555;
+    --rule: #d8cdb4;
+    --rust: #b5552c;
+    --moss: #4d6b4f;
+    --moss-bg: #e9f0e6;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: 'IBM Plex Sans', sans-serif;
+    min-height: 100vh;
+    background-image:
+      repeating-linear-gradient(transparent 0, transparent 31px, var(--rule) 31px, var(--rule) 32px);
+    background-attachment: local;
+  }
+  .wrap { max-width: 640px; margin: 0 auto; padding: 28px 20px 100px; }
+
+  header { margin-bottom: 22px; }
+  .eyebrow { font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.12em; text-transform:uppercase; color:var(--rust); margin-bottom:4px; }
+  h1 { font-family:'Fraunces',serif; font-weight:700; font-size:2.1rem; color:var(--ink); line-height:1.1; }
+  .sub { font-size:13px; color:var(--ink-soft); margin-top:6px; }
+
+  .stats { display:flex; gap:10px; margin:18px 0 22px; }
+  .stat { flex:1; background:var(--paper2); border:1px solid var(--rule); border-radius:4px; padding:10px 12px; text-align:center; }
+  .stat-num { font-family:'Fraunces',serif; font-weight:700; font-size:1.4rem; color:var(--ink); }
+  .stat-lbl { font-size:10px; color:var(--ink-soft); text-transform:uppercase; letter-spacing:.06em; margin-top:2px; }
+
+  .add-box { background:#fff; border:1px solid var(--rule); border-radius:6px; padding:16px; margin-bottom:24px; box-shadow:0 2px 6px rgba(43,38,32,.05); }
+  .add-row { display:flex; gap:8px; margin-bottom:8px; }
+  .add-row input {
+    flex:1; border:1px solid var(--rule); border-radius:4px; padding:10px 12px;
+    font-family:'IBM Plex Sans',sans-serif; font-size:14px; color:var(--ink); background:var(--paper);
+    outline:none;
+  }
+  .add-row input:focus { border-color:var(--rust); }
+  .add-btn {
+    background:var(--rust); color:#fff; border:none; border-radius:4px;
+    padding:10px 18px; font-family:'IBM Plex Sans',sans-serif; font-weight:600; font-size:13px;
+    cursor:pointer; white-space:nowrap;
+  }
+  .add-btn:active { transform: scale(.97); }
+  .add-hint { font-size:11px; color:var(--ink-soft); }
+
+  .filter-row { display:flex; gap:8px; margin-bottom:14px; overflow-x:auto; padding-bottom:2px; }
+  .filter-btn {
+    font-family:'IBM Plex Mono',monospace; font-size:11px; letter-spacing:.04em; text-transform:uppercase;
+    padding:6px 12px; border-radius:99px; border:1px solid var(--rule); background:#fff; color:var(--ink-soft);
+    cursor:pointer; white-space:nowrap; flex-shrink:0;
+  }
+  .filter-btn.active { background:var(--ink); color:var(--paper); border-color:var(--ink); }
+
+  .entry {
+    background:#fff; border:1px solid var(--rule); border-radius:6px; padding:14px 16px; margin-bottom:10px;
+    box-shadow:0 1px 4px rgba(43,38,32,.04);
+  }
+  .entry-head { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
+  .word-de { font-family:'Fraunces',serif; font-weight:600; font-size:1.15rem; color:var(--ink); }
+  .word-ua { font-size:13px; color:var(--ink-soft); margin-top:1px; }
+  .entry-actions { display:flex; gap:6px; flex-shrink:0; }
+  .icon-btn {
+    width:30px; height:30px; border-radius:4px; border:1px solid var(--rule); background:var(--paper);
+    cursor:pointer; font-size:13px; display:flex; align-items:center; justify-content:center; color:var(--ink-soft);
+  }
+  .icon-btn:hover { background:var(--paper2); }
+  .icon-btn.danger:hover { background:#fce8e3; border-color:#d98a73; color:var(--rust); }
+
+  .examples { margin-top:10px; }
+  .example-card { background:var(--moss-bg); border-radius:5px; padding:9px 11px; margin-top:6px; font-size:13px; }
+  .ex-de { color:var(--ink); line-height:1.5; }
+  .ex-ua { color:var(--moss); font-style:italic; margin-top:3px; line-height:1.4; font-size:12.5px; }
+
+  .gen-btn {
+    margin-top:10px; width:100%; background:var(--paper2); border:1px dashed var(--rule); border-radius:5px;
+    padding:9px; font-family:'IBM Plex Sans',sans-serif; font-size:12.5px; color:var(--ink-soft); cursor:pointer;
+  }
+  .gen-btn:hover { background:#ece2c8; }
+  .gen-btn:disabled { opacity:.5; cursor:default; }
+
+  .empty { text-align:center; padding:50px 20px; color:var(--ink-soft); }
+  .empty-glyph { font-family:'Fraunces',serif; font-size:2.5rem; color:var(--rule); margin-bottom:8px; }
+
+  .spin { width:13px; height:13px; border:2px solid var(--rule); border-top-color:var(--rust); border-radius:50%; display:inline-block; animation:sp .7s linear infinite; vertical-align:-2px; }
+  @keyframes sp { to { transform:rotate(360deg); } }
+
+  .toast {
+    position:fixed; bottom:24px; left:50%; transform:translateX(-50%);
+    background:var(--ink); color:var(--paper); padding:9px 18px; border-radius:99px;
+    font-size:12.5px; font-weight:500; opacity:0; transition:opacity .3s; z-index:999; max-width:90vw; text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<div class="wrap">
+  <header>
+    <div class="eyebrow">Persönliches Vokabular</div>
+    <h1>Словник Андрія</h1>
+    <div class="sub">Слова, які зустрів десь — додав сюди, AI допомагає з прикладами.</div>
+  </header>
+
+  <div class="stats">
+    <div class="stat"><div class="stat-num" id="statTotal">0</div><div class="stat-lbl">слів</div></div>
+    <div class="stat"><div class="stat-num" id="statDone">0</div><div class="stat-lbl">з прикладами</div></div>
+    <div class="stat"><div class="stat-num" id="statToday">0</div><div class="stat-lbl">додано сьогодні</div></div>
+  </div>
+
+  <div class="add-box">
+    <div class="add-row">
+      <input id="inDe" type="text" placeholder="Слово німецькою...">
+    </div>
+    <div class="add-row">
+      <input id="inUa" type="text" placeholder="Переклад (необов'язково — AI підставить)...">
+      <button class="add-btn" onclick="addWord()">+ Додати</button>
+    </div>
+    <div class="add-hint">Якщо переклад не знаєш — залиш пусто, AI перекладе сам.</div>
+  </div>
+
+  <div class="filter-row">
+    <button class="filter-btn active" data-f="all" onclick="setFilter('all')">Усі</button>
+    <button class="filter-btn" data-f="new" onclick="setFilter('new')">Без прикладів</button>
+    <button class="filter-btn" data-f="done" onclick="setFilter('done')">З прикладами</button>
+  </div>
+
+  <div id="list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const STORAGE_KEY = 'andrii_word_dict_v1';
+let words = [];
+let filter = 'all';
+
+function load() {
+  try { words = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); } catch(e) { words = []; }
+}
+function save() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(words));
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.style.opacity = '0', 2200);
+}
+
+async function callAI(prompt) {
+  const resp = await fetch('/api/claude', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ prompt })
+  });
+  if (!resp.ok) throw new Error('Server error ' + resp.status);
+  const data = await resp.json();
+  if (data.error) throw new Error(data.error);
+  return data.text || '';
+}
+
+function addWord() {
+  const de = document.getElementById('inDe').value.trim();
+  let ua = document.getElementById('inUa').value.trim();
+  if (!de) { toast('Напиши слово німецькою'); return; }
+
+  const entry = {
+    id: Date.now(),
+    de, ua,
+    examples: [],
+    added: new Date().toISOString()
+  };
+  words.unshift(entry);
+  save();
+  document.getElementById('inDe').value = '';
+  document.getElementById('inUa').value = '';
+  render();
+
+  if (!ua) {
+    translateWord(entry.id);
+  }
+}
+
+async function translateWord(id) {
+  const w = words.find(x => x.id === id);
+  if (!w) return;
+  try {
+    const text = await callAI(`Переклади німецьке слово "${w.de}" українською. Дай тільки переклад, коротко, без пояснень, без розділових знаків навколо.`);
+    w.ua = text.trim();
+    save();
+    render();
+  } catch(e) {}
+}
+
+function deleteWord(id) {
+  if (!confirm('Видалити слово?')) return;
+  words = words.filter(w => w.id !== id);
+  save();
+  render();
+}
+
+function deleteExample(id, exIdx) {
+  const w = words.find(x => x.id === id);
+  if (!w) return;
+  w.examples.splice(exIdx, 1);
+  save();
+  render();
+}
+
+async function generateExamples(id) {
+  const w = words.find(x => x.id === id);
+  if (!w) return;
+  const btn = document.getElementById('gen-' + id);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spin"></span> Генерую два приклади...'; }
+
+  const topics = [
+    "робота і колеги в офісі", "побут вдома, прибирання, готування", "подорож або відпустка",
+    "стосунки з друзями або сім'єю", "похід в магазин або ресторан", "спорт і здоров'я",
+    "навчання або курси", "погода і плани на вихідні", "транспорт, дорога на роботу",
+    "хобі і вільний час", "розмова по телефону з лікарем чи службою", "переїзд або пошук квартири"
+  ];
+  const t1 = topics[Math.floor(Math.random()*topics.length)];
+  let t2 = topics[Math.floor(Math.random()*topics.length)];
+  if (t2 === t1) t2 = topics[(topics.indexOf(t1)+1) % topics.length];
+
+  try {
+    const prompt = `Придумай 2 РІЗНИХ живих приклади речення німецькою (рівень B1-B2) зі словом "${w.de}" (${w.ua || 'переклад невідомий'}).
+Приклад 1 — контекст: ${t1}.
+Приклад 2 — контекст: ${t2}.
+Речення мають звучати природно і відрізнятись за змістом одне від одного.
+Відповідь ТІЛЬКИ JSON масивом, без пояснень:
+[{"de":"речення1","ua":"переклад1"},{"de":"речення2","ua":"переклад2"}]`;
+
+    const text = await callAI(prompt);
+    const clean = text.replace(/```json|```/g, '').trim();
+    const match = clean.match(/\[[\s\S]*\]/);
+    if (!match) throw new Error('parse');
+    const parsed = JSON.parse(match[0]);
+    w.examples = parsed.slice(0,2).map(e => ({ de: e.de, ua: e.ua }));
+    save();
+    toast('✅ Два приклади згенеровано');
+    render();
+  } catch(e) {
+    toast('Помилка генерації, спробуй ще раз');
+    render();
+  }
+}
+
+function setFilter(f) {
+  filter = f;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.toggle('active', b.dataset.f === f));
+  render();
+}
+
+function escapeHtml(s) {
+  return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function render() {
+  const list = document.getElementById('list');
+
+  document.getElementById('statTotal').textContent = words.length;
+  document.getElementById('statDone').textContent = words.filter(w => w.examples.length >= 1).length;
+  const todayStr = new Date().toDateString();
+  document.getElementById('statToday').textContent = words.filter(w => new Date(w.added).toDateString() === todayStr).length;
+
+  let shown = words;
+  if (filter === 'new') shown = words.filter(w => w.examples.length === 0);
+  if (filter === 'done') shown = words.filter(w => w.examples.length > 0);
+
+  if (!shown.length) {
+    list.innerHTML = `<div class="empty"><div class="empty-glyph">—</div>${words.length ? 'Нічого за цим фільтром' : 'Словник порожній. Додай перше слово вище.'}</div>`;
+    return;
+  }
+
+  list.innerHTML = shown.map(w => `
+    <div class="entry">
+      <div class="entry-head">
+        <div>
+          <div class="word-de">${escapeHtml(w.de)}</div>
+          <div class="word-ua">${escapeHtml(w.ua || '...')}</div>
+        </div>
+        <div class="entry-actions">
+          <button class="icon-btn danger" onclick="deleteWord(${w.id})" title="Видалити">✕</button>
+        </div>
+      </div>
+      ${w.examples.length ? `
+        <div class="examples">
+          ${w.examples.map((ex, i) => `
+            <div class="example-card">
+              <div class="ex-de">${escapeHtml(ex.de)}</div>
+              <div class="ex-ua">${escapeHtml(ex.ua)}</div>
+            </div>
+          `).join('')}
+        </div>
+      ` : ''}
+      <button class="gen-btn" id="gen-${w.id}" onclick="generateExamples(${w.id})">
+        ${w.examples.length ? '↻ Згенерувати нові приклади' : '✦ Згенерувати 2 приклади'}
+      </button>
+    </div>
+  `).join('');
+}
+
+document.getElementById('inDe').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('inUa').focus();
+});
+document.getElementById('inUa').addEventListener('keydown', e => {
+  if (e.key === 'Enter') addWord();
+});
+
+load();
+render();
+</script>
+</body>
+</html>
