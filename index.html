@@ -316,6 +316,7 @@ async function generateExamples(id) {
     if (!match) throw new Error('parse');
     const parsed = JSON.parse(match[0]);
     w.examples = [{ de: parsed.de, ua: parsed.ua }];
+    exampleVisible[w.id] = true;
     save();
     toast('✅ Приклад згенеровано');
     render();
@@ -350,6 +351,8 @@ function cardsPool() {
   return words.filter(w => w.examples.length > 0);
 }
 
+let cardExVisible = false;
+
 function renderCards() {
   const pool = cardsPool();
   const el = document.getElementById('cardsView');
@@ -373,7 +376,10 @@ function renderCards() {
         <div class="card-face back">
           <div class="card-eyebrow">Українська</div>
           <div class="card-word" style="font-size:1.3rem">${escapeHtml(w.ua || '...')}</div>
-          ${ex ? `<div class="card-ex">${escapeHtml(ex.de)}<div class="ua">${escapeHtml(ex.ua)}</div></div>` : ''}
+          ${ex ? `
+            <button class="toggle-ex-btn" style="margin-top:14px" onclick="event.stopPropagation(); toggleCardEx()">${cardExVisible ? '▴ Сховати приклад' : '▾ Показати приклад'}</button>
+            ${cardExVisible ? `<div class="card-ex">${escapeHtml(ex.de)}<div class="ua">${escapeHtml(ex.ua)}</div></div>` : ''}
+          ` : ''}
         </div>
       </div>
     </div>
@@ -385,8 +391,17 @@ function renderCards() {
   `;
 }
 
+function toggleCardEx() {
+  cardExVisible = !cardExVisible;
+  renderCards();
+  // Зберігаємо стан перевернутості після ререндеру
+  const inner = document.querySelector('.card-inner');
+  if (inner) inner.classList.add('flipped');
+}
+
 function flipCard() {
   cardFlipped = !cardFlipped;
+  if (!cardFlipped) cardExVisible = false;
   const inner = document.querySelector('.card-inner');
   if (inner) inner.classList.toggle('flipped', cardFlipped);
 }
@@ -394,6 +409,7 @@ function flipCard() {
 function cardStep(dir) {
   cardIdx += dir;
   cardFlipped = false;
+  cardExVisible = false;
   renderCards();
 }
 
@@ -480,10 +496,17 @@ function voiceMicToggle(wordId) {
     if (status) status.textContent = 'Перевіряю...';
 
     const w = words.find(x => x.id === wordId);
+    const wordEx = w && w.examples.length ? w.examples[0].de : '';
     try {
-      const prompt = `Учень вивчає німецьке слово "${w ? w.de : ''}". Він сказав речення: "${text}".
-Перевір: 1) чи речення граматично правильне, 2) чи слово "${w ? w.de : ''}" використано доречно.
-Дай дуже короткий фідбек українською (1-2 речення), доброзичливо. Якщо є помилка - покажи виправлений варіант.
+      const prompt = `Учень вивчає німецьке слово "${w ? w.de : ''}" (${w ? w.ua : ''}).
+Зразок правильного використання: "${wordEx}".
+Учень сказав голосом: "${text}".
+
+Завдання: оціни, чи учень сказав ОСМИСЛЕНЕ РЕЧЕННЯ (а не просто повторив саме слово) і чи використав слово "${w ? w.de : ''}" доречно за змістом.
+Якщо учень просто повторив слово без речення - напиши доброзичливо, що треба скласти ціле речення, і дай простий приклад.
+Якщо це речення з помилкою - покажи виправлений варіант.
+Якщо все добре - похвали коротко.
+Відповідь українською, 1-2 речення, дружньо.
 Відповідь ТІЛЬКИ JSON: {"ok": true/false, "feedback":"текст фідбеку"}`;
       const aiText = await callAI(prompt);
       const clean = aiText.replace(/```json|```/g, '').trim();
